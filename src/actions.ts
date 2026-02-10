@@ -852,10 +852,15 @@ async function handleSnapshot(
     };
   }
 
-  // Always return snapshot for CLI to handle
-  // CLI filters snapshot in JSON mode unless --raw flag is set
+  // Default: only return refs (lighter output for AI agents)
+  if (command.includeSnapshot) {
+    return successResponse(command.id, {
+      snapshot: tree || 'Empty page',
+      refs: Object.keys(simpleRefs).length > 0 ? simpleRefs : undefined,
+    });
+  }
+
   return successResponse(command.id, {
-    snapshot: tree || 'Empty page',
     refs: Object.keys(simpleRefs).length > 0 ? simpleRefs : undefined,
   });
 }

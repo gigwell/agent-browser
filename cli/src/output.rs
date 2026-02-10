@@ -1044,6 +1044,7 @@ Options:
   -c, --compact        Remove empty structural elements
   -d, --depth <n>      Limit tree depth
   -s, --selector <sel> Scope snapshot to CSS selector
+  -r, --raw            Include full snapshot text (heavy, for debugging)
 
 Global Options:
   --json               Output as JSON
@@ -1055,6 +1056,7 @@ Examples:
   agent-browser snapshot -i -C         # Interactive + cursor-interactive elements
   agent-browser snapshot --compact --depth 5
   agent-browser snapshot -s "#main-content"
+  agent-browser snapshot -i --json --raw   # Include full snapshot in JSON output
 "##
         }
 

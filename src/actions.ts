@@ -158,8 +158,11 @@ export function setScreencastFrameCallback(
 
 // Snapshot response type
 interface SnapshotData {
-  snapshot: string;
-  refs?: Record<string, { role: string; name?: string }>;
+  snapshot?: string;
+  refs?: Record<
+    string,
+    { role: string; name?: string; attributes?: Record<string, string | boolean> }
+  >;
 }
 
 /**
@@ -819,6 +822,7 @@ async function handleSnapshot(
     maxDepth?: number;
     compact?: boolean;
     selector?: string;
+    includeSnapshot?: boolean;
   },
   browser: BrowserManager
 ): Promise<Response<SnapshotData>> {
@@ -848,8 +852,15 @@ async function handleSnapshot(
     };
   }
 
+  // Default: only return refs (lighter output for AI agents)
+  if (command.includeSnapshot) {
+    return successResponse(command.id, {
+      snapshot: tree || 'Empty page',
+      refs: Object.keys(simpleRefs).length > 0 ? simpleRefs : undefined,
+    });
+  }
+
   return successResponse(command.id, {
-    snapshot: tree || 'Empty page',
     refs: Object.keys(simpleRefs).length > 0 ? simpleRefs : undefined,
   });
 }

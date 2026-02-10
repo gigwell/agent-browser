@@ -813,6 +813,12 @@ export interface ScreenshotCommand extends BaseCommand {
 
 export interface SnapshotCommand extends BaseCommand {
   action: 'snapshot';
+  interactive?: boolean;
+  cursor?: boolean;
+  maxDepth?: number;
+  compact?: boolean;
+  selector?: string;
+  includeSnapshot?: boolean;
 }
 
 export interface EvaluateCommand extends BaseCommand {
@@ -1053,7 +1059,11 @@ export interface ScreenshotData {
 }
 
 export interface SnapshotData {
-  snapshot: string;
+  snapshot?: string;
+  refs?: Record<
+    string,
+    { role: string; name?: string; attributes?: Record<string, string | boolean> }
+  >;
 }
 
 export interface EvaluateData {

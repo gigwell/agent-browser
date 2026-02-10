@@ -71,6 +71,19 @@ interface PageError {
   timestamp: number;
 }
 
+// TODO: move this into the BrowserManager properly.
+// Get global timeout from env var or use default
+function getGlobalTimeout(): number {
+  const envTimeout = process.env.AGENT_BROWSER_TIMEOUT;
+  if (envTimeout) {
+    const parsed = parseInt(envTimeout, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return 60000;
+}
+
 /**
  * Manages the Playwright browser lifecycle with multiple tabs/windows
  */
@@ -993,7 +1006,7 @@ export class BrowserManager {
       this.kernelSessionId = session.session_id;
       this.kernelApiKey = kernelApiKey;
       this.browser = browser;
-      context.setDefaultTimeout(60000);
+      context.setDefaultTimeout(getGlobalTimeout());
       this.contexts.push(context);
       this.pages.push(page);
       this.activePageIndex = 0;
@@ -1066,7 +1079,7 @@ export class BrowserManager {
       this.browserUseSessionId = session.id;
       this.browserUseApiKey = browserUseApiKey;
       this.browser = browser;
-      context.setDefaultTimeout(60000);
+      context.setDefaultTimeout(getGlobalTimeout());
       this.contexts.push(context);
       this.pages.push(page);
       this.activePageIndex = 0;
@@ -1314,7 +1327,7 @@ export class BrowserManager {
       });
     }
 
-    context.setDefaultTimeout(60000);
+    context.setDefaultTimeout(getGlobalTimeout());
     this.contexts.push(context);
     this.setupContextTracking(context);
 
@@ -1629,7 +1642,7 @@ export class BrowserManager {
     const context = await this.browser.newContext({
       viewport: viewport === undefined ? { width: 1280, height: 720 } : viewport,
     });
-    context.setDefaultTimeout(60000);
+    context.setDefaultTimeout(getGlobalTimeout());
     this.contexts.push(context);
     this.setupContextTracking(context);
 

@@ -199,6 +199,8 @@ pub struct Flags {
     pub auto_connect: bool,
     pub session_name: Option<String>,
     pub annotate: bool,
+    pub timeout: Option<u64>,
+    pub action_timeout: Option<u64>,
 
     // Track which launch-time options were explicitly passed via CLI
     // (as opposed to being set only via environment variables)
@@ -278,6 +280,9 @@ pub fn parse_flags(args: &[String]) -> Flags {
             .or(config.session_name),
         annotate: env_var_is_truthy("AGENT_BROWSER_ANNOTATE")
             || config.annotate.unwrap_or(false),
+            // TODO: These seem like they should have an env read here, per the new pattern.
+        timeout: None,
+        action_timeout: None,
         cli_executable_path: false,
         cli_extensions: false,
         cli_profile: false,
@@ -429,6 +434,23 @@ pub fn parse_flags(args: &[String]) -> Flags {
                 // Already handled by load_config(); skip the value
                 i += 1;
             }
+            "--default-timeout" => {
+                if let Some(t) = args.get(i + 1) {
+                    if let Ok(timeout) = t.parse::<u64>() {
+                        flags.timeout = Some(timeout);
+                    }
+                    i += 1;
+                }
+            }
+            "--timeout" | "--default-action-timeout" => {
+                if let Some(t) = args.get(i + 1) {
+                    if let Ok(timeout) = t.parse::<u64>() {
+                        flags.action_timeout = Some(timeout);
+                    }
+                    i += 1;
+                }
+            }
+            // Note: --timeout is per-command, handled in commands.rs, not stripped here
             _ => {}
         }
         i += 1;
@@ -469,6 +491,10 @@ pub fn clean_args(args: &[String]) -> Vec<String> {
         "--device",
         "--session-name",
         "--config",
+        // TODO: Too many options
+        "--default-timeout",
+        "--timeout",
+        "--default-action-timeout",
     ];
 
     let mut i = 0;
@@ -1025,5 +1051,55 @@ mod tests {
         };
         let merged = user.merge(project);
         assert_eq!(merged.extensions, Some(vec!["/ext2".to_string()]));
+    }
+
+    // === Timeout Flag Tests ===
+
+    #[test]
+    fn test_parse_timeout_flag() {
+        let flags = parse_flags(&args("--timeout 30000 click @e1"));
+        assert_eq!(flags.action_timeout, Some(30000));
+    }
+
+    #[test]
+    fn test_parse_timeout_with_session() {
+        let flags = parse_flags(&args("--session mysession --timeout 45000 fill @e2 hello"));
+        assert_eq!(flags.session, "mysession");
+        assert_eq!(flags.action_timeout, Some(45000));
+    }
+
+    #[test]
+    fn test_parse_timeout_backward_compat() {
+        // --default-action-timeout should still work
+        let flags = parse_flags(&args("--default-action-timeout 60000 click @e1"));
+        assert_eq!(flags.action_timeout, Some(60000));
+    }
+
+    #[test]
+    fn test_clean_args_removes_timeout() {
+        let cleaned = clean_args(&args("--timeout 30000 click @e1"));
+        assert_eq!(cleaned, vec!["click", "@e1"]);
+    }
+
+    #[test]
+    fn test_clean_args_removes_default_action_timeout() {
+        let cleaned = clean_args(&args("--default-action-timeout 30000 click @e1"));
+        assert_eq!(cleaned, vec!["click", "@e1"]);
+    }
+
+    #[test]
+    fn test_parse_timeout_no_value() {
+        let flags = parse_flags(&args("--timeout"));
+        assert_eq!(flags.action_timeout, None);
+    }
+
+    #[test]
+    fn test_parse_timeout_invalid_value() {
+        let flags = parse_flags(&args("--timeout notanumber click @e1"));
+        // Invalid value should result in None (parse fails silently)
+        assert_eq!(flags.action_timeout, None);
+        // But command should still be parsed correctly
+        let cleaned = clean_args(&args("--timeout notanumber click @e1"));
+        assert_eq!(cleaned, vec!["click", "@e1"]);
     }
 }

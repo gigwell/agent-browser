@@ -17,6 +17,7 @@ import {
   cleanupExpiredStates,
   getAutoStateFilePath,
 } from './state-utils.js';
+import { getActionTimeout } from './timeout.js';
 
 // Manager type - either desktop browser or iOS
 type Manager = BrowserManager | IOSManager;
@@ -363,12 +364,13 @@ export async function startDaemon(options?: {
                 success: true as const,
                 data: { devices },
               };
-              socket.write(serializeResponse(response) + '\n');
+              const respStr = serializeResponse(response) + '\n';
+              socket.write(respStr);
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err);
-              socket.write(
-                serializeResponse(errorResponse(parseResult.command.id, message)) + '\n'
-              );
+              const respStr =
+                serializeResponse(errorResponse(parseResult.command.id, message)) + '\n';
+              socket.write(respStr);
             }
             continue;
           }

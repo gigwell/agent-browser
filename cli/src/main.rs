@@ -600,7 +600,9 @@ fn main() {
             let success = resp.success;
             // Extract action for context-specific output handling
             let action = cmd.get("action").and_then(|v| v.as_str());
-            print_response(&resp, flags.json, action);
+            // Check if --raw flag was set (includeSnapshot field in command)
+            let raw_mode = cmd.get("includeSnapshot").and_then(|v| v.as_bool()).unwrap_or(false);
+            print_response(&resp, flags.json, action, raw_mode);
             if !success {
                 exit(1);
             }

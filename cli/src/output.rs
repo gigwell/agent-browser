@@ -1,8 +1,23 @@
 use crate::color;
 use crate::connection::Response;
 
-pub fn print_response(resp: &Response, json_mode: bool, action: Option<&str>) {
+pub fn print_response(resp: &Response, json_mode: bool, action: Option<&str>, raw_mode: bool) {
     if json_mode {
+        // In JSON mode: strip snapshot unless --raw flag is set
+        if !raw_mode && action == Some("snapshot") {
+            if let Some(mut data) = resp.data.clone() {
+                if let Some(obj) = data.as_object_mut() {
+                    obj.remove("snapshot");
+                    let filtered_resp = serde_json::json!({
+                        "success": resp.success,
+                        "data": data,
+                        "error": resp.error
+                    });
+                    println!("{}", serde_json::to_string(&filtered_resp).unwrap_or_default());
+                    return;
+                }
+            }
+        }
         println!("{}", serde_json::to_string(resp).unwrap_or_default());
         return;
     }

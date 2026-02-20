@@ -1585,7 +1585,6 @@ mod tests {
             device: None,
             auto_connect: false,
             session_name: None,
-            timeout: None,
             action_timeout: None,
             cli_executable_path: false,
             cli_extensions: false,

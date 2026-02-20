@@ -27,6 +27,7 @@ import {
   decryptData,
   ENCRYPTION_KEY_ENV,
 } from './state-utils.js';
+import { getGlobalTimeout } from './timeout.js';
 
 // Screencast frame data from CDP
 export interface ScreencastFrame {
@@ -69,19 +70,6 @@ interface ConsoleMessage {
 interface PageError {
   message: string;
   timestamp: number;
-}
-
-// TODO: move this into the BrowserManager properly.
-// Get global timeout from env var or use default
-function getGlobalTimeout(): number {
-  const envTimeout = process.env.AGENT_BROWSER_TIMEOUT;
-  if (envTimeout) {
-    const parsed = parseInt(envTimeout, 10);
-    if (!isNaN(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-  return 60000;
 }
 
 /**

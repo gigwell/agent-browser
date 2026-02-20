@@ -1987,6 +1987,7 @@ Options:
   --cdp <port>               Connect via CDP (Chrome DevTools Protocol)
   --auto-connect             Auto-discover and connect to running Chrome
   --session-name <name>      Auto-save/restore session state (cookies, localStorage)
+  --action-timeout <ms>      Timeout for browser actions in milliseconds (or AGENT_BROWSER_ACTION_TIMEOUT)
   --config <path>            Use a custom config file (or AGENT_BROWSER_CONFIG env)
   --debug                    Debug output
   --version, -V              Show version
@@ -2027,6 +2028,7 @@ Environment:
   AGENT_BROWSER_PROVIDER         Browser provider (ios, browserbase, kernel, browseruse)
   AGENT_BROWSER_AUTO_CONNECT     Auto-discover and connect to running Chrome
   AGENT_BROWSER_ALLOW_FILE_ACCESS Allow file:// URLs to access local files
+  AGENT_BROWSER_ACTION_TIMEOUT   Timeout for browser actions in milliseconds
   AGENT_BROWSER_STREAM_PORT      Enable WebSocket streaming on port (e.g., 9223)
   AGENT_BROWSER_IOS_DEVICE       Default iOS device name
   AGENT_BROWSER_IOS_UDID         Default iOS device UDID

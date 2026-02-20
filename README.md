@@ -429,6 +429,7 @@ This is useful for multimodal AI models that can reason about visual layout, unl
 |--------|-------------|
 | `--session <name>` | Use isolated session (or `AGENT_BROWSER_SESSION` env) |
 | `--session-name <name>` | Auto-save/restore session state (or `AGENT_BROWSER_SESSION_NAME` env) |
+| `--action-timeout <ms>` | Timeout for browser actions in milliseconds (or `AGENT_BROWSER_ACTION_TIMEOUT` env) |
 | `--profile <path>` | Persistent browser profile directory (or `AGENT_BROWSER_PROFILE` env) |
 | `--state <path>` | Load storage state from JSON file (or `AGENT_BROWSER_STATE` env) |
 | `--headers <json>` | Set HTTP headers scoped to the URL's origin |

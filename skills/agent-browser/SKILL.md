@@ -55,6 +55,7 @@ agent-browser close                   # Close browser
 agent-browser snapshot -i             # Interactive elements with refs (recommended)
 agent-browser snapshot -i -C          # Include cursor-interactive elements (divs with onclick, cursor:pointer)
 agent-browser snapshot -s "#selector" # Scope to CSS selector
+agent-browser snapshot -r             # Include snapshot in JSON output (for programmatic parsing)
 
 # Interaction (use @refs from snapshot)
 agent-browser click @e1               # Click element
@@ -221,7 +222,18 @@ agent-browser -p ios close
 
 ## Timeouts and Slow Pages
 
-The default Playwright timeout is 60 seconds for local browsers. For slow websites or large pages, use explicit waits instead of relying on the default timeout:
+The default action timeout is 10 seconds. Use `--action-timeout` to configure timeout for browser actions:
+
+```bash
+# Set timeout for all actions in this command
+agent-browser --action-timeout 30000 click @e1
+
+# Via environment variable
+export AGENT_BROWSER_ACTION_TIMEOUT=30000
+agent-browser click @e1
+```
+
+For slow websites or large pages, use explicit waits instead of relying on the default timeout:
 
 ```bash
 # Wait for network activity to settle (best for slow pages)

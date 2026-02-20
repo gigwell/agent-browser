@@ -767,7 +767,7 @@ describe('BrowserManager', () => {
       await page.setContent(`
         <html>
           <body>
-            <button id="btn" aria-expanded="true">Toggle</button>
+            <button id="btn" aria-expanded="true" aria-pressed="true">Toggle</button>
           </body>
         </html>
       `);
@@ -779,6 +779,7 @@ describe('BrowserManager', () => {
       expect(buttonRef).toBeDefined();
       expect(buttonRef?.attributes).toBeDefined();
       expect(buttonRef?.attributes?.expanded).toBe(true);
+      expect(buttonRef?.attributes?.pressed).toBe(true);
     });
 
     it('should include ARIA attributes in snapshot tree output', async () => {

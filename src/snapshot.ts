@@ -150,7 +150,15 @@ function parseAttributes(suffix: string): Record<string, string | boolean> {
   const matches = suffix.matchAll(/\[(\w+)(?:=([^\]]*))?\]/g);
   for (const match of matches) {
     const [, key, value] = match;
-    attrs[key] = value ?? true; // true for boolean flags like [expanded]
+    if (value === undefined) {
+      attrs[key] = true; // Boolean flag like [expanded]
+    } else if (value === 'true') {
+      attrs[key] = true;
+    } else if (value === 'false') {
+      attrs[key] = false;
+    } else {
+      attrs[key] = value; // Keep as string for other values like [level=1]
+    }
   }
   return attrs;
 }

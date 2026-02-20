@@ -55,7 +55,7 @@ agent-browser close                   # Close browser
 agent-browser snapshot -i             # Interactive elements with refs (recommended)
 agent-browser snapshot -i -C          # Include cursor-interactive elements (divs with onclick, cursor:pointer)
 agent-browser snapshot -s "#selector" # Scope to CSS selector
-agent-browser snapshot -r             # Include snapshot in JSON output (for programmatic parsing)
+agent-browser snapshot --no-snapshot  # Exclude snapshot text from JSON output (smaller payload)
 
 # Interaction (use @refs from snapshot)
 agent-browser click @e1               # Click element

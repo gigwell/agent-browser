@@ -1,10 +1,10 @@
 use crate::color;
 use crate::connection::Response;
 
-pub fn print_response(resp: &Response, json_mode: bool, action: Option<&str>, raw_mode: bool) {
+pub fn print_response(resp: &Response, json_mode: bool, action: Option<&str>, no_snapshot: bool) {
     if json_mode {
-        // In JSON mode: strip snapshot unless --raw flag is set
-        if !raw_mode && action == Some("snapshot") {
+        // In JSON mode: strip snapshot when --no-snapshot flag is set
+        if no_snapshot && action == Some("snapshot") {
             if let Some(mut data) = resp.data.clone() {
                 if let Some(obj) = data.as_object_mut() {
                     obj.remove("snapshot");
@@ -1059,7 +1059,7 @@ Options:
   -c, --compact        Remove empty structural elements
   -d, --depth <n>      Limit tree depth
   -s, --selector <sel> Scope snapshot to CSS selector
-  -r, --raw            Include full snapshot text (heavy, for debugging)
+  --no-snapshot        Exclude snapshot from JSON output (refs only, smaller payload)
 
 Global Options:
   --json               Output as JSON
@@ -1071,7 +1071,7 @@ Examples:
   agent-browser snapshot -i -C         # Interactive + cursor-interactive elements
   agent-browser snapshot --compact --depth 5
   agent-browser snapshot -s "#main-content"
-  agent-browser snapshot -i --json --raw   # Include full snapshot in JSON output
+  agent-browser snapshot -i --json --no-snapshot   # Exclude snapshot for smaller payload
 "##
         }
 

@@ -441,8 +441,8 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
                             i += 1;
                         }
                     }
-                    "-r" | "--raw" => {
-                        obj.insert("includeSnapshot".to_string(), json!(true));
+                    "--no-snapshot" => {
+                        obj.insert("includeSnapshot".to_string(), json!(false));
                     }
                     _ => {}
                 }
@@ -2229,17 +2229,10 @@ mod tests {
     }
 
     #[test]
-    fn test_snapshot_raw() {
-        let cmd = parse_command(&args("snapshot --raw"), &default_flags()).unwrap();
+    fn test_snapshot_no_snapshot() {
+        let cmd = parse_command(&args("snapshot --no-snapshot"), &default_flags()).unwrap();
         assert_eq!(cmd["action"], "snapshot");
-        assert_eq!(cmd["includeSnapshot"], true);
-    }
-
-    #[test]
-    fn test_snapshot_raw_short() {
-        let cmd = parse_command(&args("snapshot -r"), &default_flags()).unwrap();
-        assert_eq!(cmd["action"], "snapshot");
-        assert_eq!(cmd["includeSnapshot"], true);
+        assert_eq!(cmd["includeSnapshot"], false);
     }
 
     // === Wait ===

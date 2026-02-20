@@ -852,10 +852,16 @@ async function handleSnapshot(
     };
   }
 
-  // Always return snapshot for CLI to handle
-  // CLI filters snapshot in JSON mode unless --raw flag is set
+  // Default: include snapshot in response
+  // Use --no-snapshot to exclude for smaller payload
+  if (command.includeSnapshot !== false) {
+    return successResponse(command.id, {
+      snapshot: tree || 'Empty page',
+      refs: Object.keys(simpleRefs).length > 0 ? simpleRefs : undefined,
+    });
+  }
+
   return successResponse(command.id, {
-    snapshot: tree || 'Empty page',
     refs: Object.keys(simpleRefs).length > 0 ? simpleRefs : undefined,
   });
 }

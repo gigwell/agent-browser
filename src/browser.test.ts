@@ -761,6 +761,42 @@ describe('BrowserManager', () => {
       const result = await page.locator('#result').textContent();
       expect(result).toBe('clicked');
     });
+
+    it('should capture ARIA attributes in snapshot refs', async () => {
+      const page = browser.getPage();
+      await page.setContent(`
+        <html>
+          <body>
+            <button id="btn" aria-expanded="true">Toggle</button>
+          </body>
+        </html>
+      `);
+
+      const { refs } = await browser.getSnapshot({ interactive: true });
+
+      // Find the button ref and check its ARIA attributes
+      const buttonRef = Object.values(refs).find((r) => r.name === 'Toggle');
+      expect(buttonRef).toBeDefined();
+      expect(buttonRef?.attributes).toBeDefined();
+      expect(buttonRef?.attributes?.expanded).toBe(true);
+    });
+
+    it('should include ARIA attributes in snapshot tree output', async () => {
+      const page = browser.getPage();
+      await page.setContent(`
+        <html>
+          <body>
+            <button aria-expanded="true" aria-pressed="true">Menu</button>
+          </body>
+        </html>
+      `);
+
+      const { tree } = await browser.getSnapshot({ interactive: true });
+
+      // ARIA attributes should appear in tree output
+      expect(tree).toContain('[expanded]');
+      expect(tree).toContain('[pressed]');
+    });
   });
 
   describe('locator resolution', () => {

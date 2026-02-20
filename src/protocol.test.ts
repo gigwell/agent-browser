@@ -551,6 +551,22 @@ describe('parseCommand', () => {
         expect(result.command.selector).toBe('.content');
       }
     });
+
+    it('should parse snapshot with includeSnapshot false', () => {
+      const result = parseCommand(cmd({ id: '1', action: 'snapshot', includeSnapshot: false }));
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.command.includeSnapshot).toBe(false);
+      }
+    });
+
+    it('should default includeSnapshot to undefined when not specified', () => {
+      const result = parseCommand(cmd({ id: '1', action: 'snapshot' }));
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.command.includeSnapshot).toBeUndefined();
+      }
+    });
   });
 
   describe('launch', () => {

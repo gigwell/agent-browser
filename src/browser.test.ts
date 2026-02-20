@@ -798,6 +798,46 @@ describe('BrowserManager', () => {
       expect(tree).toContain('[expanded]');
       expect(tree).toContain('[pressed]');
     });
+
+    it('should include snapshot by default via executeCommand', async () => {
+      const page = browser.getPage();
+      await page.setContent(`
+        <html>
+          <body>
+            <button>Test Button</button>
+          </body>
+        </html>
+      `);
+
+      const result = await executeCommand(
+        { id: 'test', action: 'snapshot', interactive: true },
+        browser
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data?.snapshot).toBeDefined();
+      expect(result.data?.refs).toBeDefined();
+    });
+
+    it('should exclude snapshot when includeSnapshot is false', async () => {
+      const page = browser.getPage();
+      await page.setContent(`
+        <html>
+          <body>
+            <button>Test Button</button>
+          </body>
+        </html>
+      `);
+
+      const result = await executeCommand(
+        { id: 'test', action: 'snapshot', interactive: true, includeSnapshot: false },
+        browser
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data?.snapshot).toBeUndefined();
+      expect(result.data?.refs).toBeDefined();
+    });
   });
 
   describe('locator resolution', () => {

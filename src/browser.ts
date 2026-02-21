@@ -156,6 +156,20 @@ export class BrowserManager {
   }
 
   /**
+   * Get the last snapshot tree text (empty string if no snapshot has been taken)
+   */
+  getLastSnapshot(): string {
+    return this.lastSnapshot;
+  }
+
+  /**
+   * Update the stored snapshot (used by diff to keep the baseline current)
+   */
+  setLastSnapshot(snapshot: string): void {
+    this.lastSnapshot = snapshot;
+  }
+
+  /**
    * Get the cached ref map from last snapshot
    */
   getRefMap(): RefMap {

@@ -392,6 +392,7 @@ fn main() {
         }
     }
 
+    let timeout_str = flags.action_timeout.as_ref().map(|t| t.to_string());
     let daemon_opts = DaemonOptions {
         headed: flags.headed,
         debug: flags.debug,
@@ -413,6 +414,8 @@ fn main() {
         action_policy: flags.action_policy.as_deref(),
         confirm_actions: flags.confirm_actions.as_deref(),
         native: flags.native,
+        timeout: timeout_str.as_deref(),
+        action_timeout: timeout_str.as_deref(),
     };
     let daemon_result = match ensure_daemon(&flags.session, &daemon_opts) {
         Ok(result) => result,

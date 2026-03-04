@@ -430,9 +430,9 @@ function processAriaTree(ariaTree: string, refs: RefMap, options: SnapshotOption
         const attributes = parseAttributes(suffix);
         tracker.trackRef(roleLower, name, ref);
         refs[ref] = {
-          selector: buildSelector(roleLower, resolvedName),
+          selector: buildSelector(roleLower, name),
           role: roleLower,
-          name: resolvedName,
+          name: name,
           nth, // Always store nth, we'll use it for duplicates
           attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
         };
@@ -560,9 +560,9 @@ function processLine(
     tracker.trackRef(roleLower, name, ref);
 
     refs[ref] = {
-      selector: buildSelector(roleLower, resolvedName),
+      selector: buildSelector(roleLower, name),
       role: roleLower,
-      name: resolvedName,
+      name: name,
       nth, // Always store nth, we'll clean up non-duplicates later
       attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
     };

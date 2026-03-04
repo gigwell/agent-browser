@@ -2,6 +2,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "": "Headless Browser\nAutomation for AI",
   installation: "Installation",
   "quick-start": "Quick Start",
+  skills: "Skills",
   commands: "Commands",
   configuration: "Configuration",
   selectors: "Selectors",
@@ -12,6 +13,8 @@ export const PAGE_TITLES: Record<string, string> = {
   streaming: "Streaming",
   profiler: "Profiler",
   ios: "iOS Simulator",
+  security: "Security",
+  "native-mode": "Native Mode (Experimental)",
   changelog: "Changelog",
 };
 

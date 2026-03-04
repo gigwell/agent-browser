@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import { BrowserManager } from './browser.js';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { BrowserManager, getDefaultTimeout } from './browser.js';
 import { executeCommand } from './actions.js';
 import { chromium } from 'playwright-core';
 
@@ -151,6 +151,30 @@ describe('BrowserManager', () => {
         browser
       );
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('unnamed-button ref uniqueness', () => {
+    it('should click the correct unnamed button among named buttons', async () => {
+      const page = browser.getPage();
+      // 1 unnamed button among 2 named buttons
+      await page.setContent(`
+        <html><body>
+          <button>OK</button>
+          <button onclick="document.title='unnamed'"></button>
+          <button>Cancel</button>
+        </body></html>
+      `);
+
+      const snapshot = await browser.getSnapshot();
+      const refs = snapshot.refs;
+      const unnamedRefs = Object.entries(refs).filter(([, v]) => v.role === 'button' && !v.name);
+      expect(unnamedRefs.length).toBe(1);
+
+      const [refId] = unnamedRefs[0];
+      await executeCommand({ id: 'test', action: 'click', selector: `@${refId}` }, browser);
+      const title = await page.title();
+      expect(title).toBe('unnamed');
     });
   });
 
@@ -1271,5 +1295,58 @@ describe('BrowserManager', () => {
         })
       ).resolves.not.toThrow();
     });
+  });
+});
+
+describe('getDefaultTimeout', () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('should return 25000 when env var is not set', () => {
+    delete process.env.AGENT_BROWSER_DEFAULT_TIMEOUT;
+    expect(getDefaultTimeout()).toBe(25000);
+  });
+
+  it('should return parsed value when env var is a valid positive integer', () => {
+    process.env.AGENT_BROWSER_DEFAULT_TIMEOUT = '10000';
+    expect(getDefaultTimeout()).toBe(10000);
+  });
+
+  it('should return 25000 for negative values', () => {
+    process.env.AGENT_BROWSER_DEFAULT_TIMEOUT = '-1';
+    expect(getDefaultTimeout()).toBe(25000);
+  });
+
+  it('should return 25000 for zero', () => {
+    process.env.AGENT_BROWSER_DEFAULT_TIMEOUT = '0';
+    expect(getDefaultTimeout()).toBe(25000);
+  });
+
+  it('should return 25000 for values below 1000ms floor', () => {
+    process.env.AGENT_BROWSER_DEFAULT_TIMEOUT = '500';
+    expect(getDefaultTimeout()).toBe(25000);
+  });
+
+  it('should accept exactly 1000ms as the minimum', () => {
+    process.env.AGENT_BROWSER_DEFAULT_TIMEOUT = '1000';
+    expect(getDefaultTimeout()).toBe(1000);
+  });
+
+  it('should return 25000 for non-numeric strings', () => {
+    process.env.AGENT_BROWSER_DEFAULT_TIMEOUT = 'abc';
+    expect(getDefaultTimeout()).toBe(25000);
+  });
+
+  it('should return 25000 for empty string', () => {
+    process.env.AGENT_BROWSER_DEFAULT_TIMEOUT = '';
+    expect(getDefaultTimeout()).toBe(25000);
+  });
+
+  it('should allow overriding above 25s for users who need longer timeouts', () => {
+    process.env.AGENT_BROWSER_DEFAULT_TIMEOUT = '60000';
+    expect(getDefaultTimeout()).toBe(60000);
   });
 });

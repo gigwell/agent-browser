@@ -65,7 +65,10 @@ agent-browser type @e2 "text"         # Type without clearing
 agent-browser select @e1 "option"     # Select dropdown option
 agent-browser check @e1               # Check checkbox
 agent-browser press Enter             # Press key
+agent-browser keyboard type "text"    # Type at current focus (no selector)
+agent-browser keyboard inserttext "text"  # Insert without key events
 agent-browser scroll down 500         # Scroll page
+agent-browser scroll down 500 --selector "div.content"  # Scroll within a specific container
 
 # Get information
 agent-browser get text @e1            # Get element text
@@ -77,6 +80,11 @@ agent-browser wait @e1                # Wait for element
 agent-browser wait --load networkidle # Wait for network idle
 agent-browser wait --url "**/page"    # Wait for URL pattern
 agent-browser wait 2000               # Wait milliseconds
+
+# Downloads
+agent-browser download @e1 ./file.pdf          # Click element to trigger download
+agent-browser wait --download ./output.zip     # Wait for any download to complete
+agent-browser --download-path ./downloads open <url>  # Set default download directory
 
 # Capture
 agent-browser screenshot              # Screenshot to temp dir
@@ -106,6 +114,22 @@ agent-browser select @e3 "California"
 agent-browser check @e4
 agent-browser click @e5
 agent-browser wait --load networkidle
+```
+
+### Authentication with Auth Vault (Recommended)
+
+```bash
+# Save credentials once (encrypted with AGENT_BROWSER_ENCRYPTION_KEY)
+# Recommended: pipe password via stdin to avoid shell history exposure
+echo "pass" | agent-browser auth save github --url https://github.com/login --username user --password-stdin
+
+# Login using saved profile (LLM never sees password)
+agent-browser auth login github
+
+# List/show/delete profiles
+agent-browser auth list
+agent-browser auth show github
+agent-browser auth delete github
 ```
 
 ### Authentication with State Persistence
@@ -183,6 +207,19 @@ agent-browser --auto-connect snapshot
 agent-browser --cdp 9222 snapshot
 ```
 
+### Color Scheme (Dark Mode)
+
+```bash
+# Persistent dark mode via flag (applies to all pages and new tabs)
+agent-browser --color-scheme dark open https://example.com
+
+# Or via environment variable
+AGENT_BROWSER_COLOR_SCHEME=dark agent-browser open https://example.com
+
+# Or set during session (persists for subsequent commands)
+agent-browser set media dark
+```
+
 ### Visual Browser (Debugging)
 
 ```bash
@@ -192,6 +229,8 @@ agent-browser record start demo.webm # Record session
 agent-browser profiler start         # Start Chrome DevTools profiling
 agent-browser profiler stop trace.json # Stop and save profile (path optional)
 ```
+
+Use `AGENT_BROWSER_HEADED=1` to enable headed mode via environment variable. Browser extensions work in both headed and headless mode.
 
 ### Local Files (PDFs, HTML)
 
@@ -228,6 +267,56 @@ agent-browser -p ios close
 
 **Real devices:** Works with physical iOS devices if pre-configured. Use `--device "<UDID>"` where UDID is from `xcrun xctrace list devices`.
 
+## Security
+
+All security features are opt-in. By default, agent-browser imposes no restrictions on navigation, actions, or output.
+
+### Content Boundaries (Recommended for AI Agents)
+
+Enable `--content-boundaries` to wrap page-sourced output in markers that help LLMs distinguish tool output from untrusted page content:
+
+```bash
+export AGENT_BROWSER_CONTENT_BOUNDARIES=1
+agent-browser snapshot
+# Output:
+# --- AGENT_BROWSER_PAGE_CONTENT nonce=<hex> origin=https://example.com ---
+# [accessibility tree]
+# --- END_AGENT_BROWSER_PAGE_CONTENT nonce=<hex> ---
+```
+
+### Domain Allowlist
+
+Restrict navigation to trusted domains. Wildcards like `*.example.com` also match the bare domain `example.com`. Sub-resource requests, WebSocket, and EventSource connections to non-allowed domains are also blocked. Include CDN domains your target pages depend on:
+
+```bash
+export AGENT_BROWSER_ALLOWED_DOMAINS="example.com,*.example.com"
+agent-browser open https://example.com        # OK
+agent-browser open https://malicious.com       # Blocked
+```
+
+### Action Policy
+
+Use a policy file to gate destructive actions:
+
+```bash
+export AGENT_BROWSER_ACTION_POLICY=./policy.json
+```
+
+Example `policy.json`:
+```json
+{"default": "deny", "allow": ["navigate", "snapshot", "click", "scroll", "wait", "get"]}
+```
+
+Auth vault operations (`auth login`, etc.) bypass action policy but domain allowlist still applies.
+
+### Output Limits
+
+Prevent context flooding from large pages:
+
+```bash
+export AGENT_BROWSER_MAX_OUTPUT=50000
+```
+
 ## Diffing (Verifying Changes)
 
 Use `diff snapshot` after performing an action to verify it had the intended effect. This compares the current accessibility tree against the last snapshot taken in the session.
@@ -255,7 +344,7 @@ agent-browser diff url https://staging.example.com https://prod.example.com --sc
 
 ## Timeouts and Slow Pages
 
-The default action timeout is 10 seconds. Use `--action-timeout` to configure timeout for browser actions:
+The default Playwright timeout is 25 seconds for local browsers. This can be overridden with the `AGENT_BROWSER_DEFAULT_TIMEOUT` environment variable (value in milliseconds). Use `--action-timeout` to configure timeout for browser actions:
 
 ```bash
 # Set timeout for all actions in this command
@@ -409,6 +498,21 @@ Priority (lowest to highest): `~/.agent-browser/config.json` < `./agent-browser.
 | [references/video-recording.md](references/video-recording.md) | Recording workflows for debugging and documentation |
 | [references/profiling.md](references/profiling.md) | Chrome DevTools profiling for performance analysis |
 | [references/proxy-support.md](references/proxy-support.md) | Proxy configuration, geo-testing, rotating proxies |
+
+## Experimental: Native Mode
+
+agent-browser has an experimental native Rust daemon that communicates with Chrome directly via CDP, bypassing Node.js and Playwright entirely. It is opt-in and not recommended for production use yet.
+
+```bash
+# Enable via flag
+agent-browser --native open example.com
+
+# Enable via environment variable (avoids passing --native every time)
+export AGENT_BROWSER_NATIVE=1
+agent-browser open example.com
+```
+
+The native daemon supports Chromium and Safari (via WebDriver). Firefox and WebKit are not yet supported. All core commands (navigate, snapshot, click, fill, screenshot, cookies, storage, tabs, eval, etc.) work identically in native mode. Use `agent-browser close` before switching between native and default mode within the same session.
 
 ## Ready-to-Use Templates
 

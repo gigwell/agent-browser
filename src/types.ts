@@ -32,6 +32,11 @@ export interface LaunchCommand extends BaseCommand {
   provider?: string;
   ignoreHTTPSErrors?: boolean;
   allowFileAccess?: boolean; // Enable file:// URL access and cross-origin file requests
+  colorScheme?: 'light' | 'dark' | 'no-preference'; // Persistent color scheme override
+  downloadPath?: string; // Directory for browser downloads (Playwright's downloadsPath)
+  allowedDomains?: string[];
+  actionPolicy?: string;
+  confirmActions?: string[];
   // Auto-load state file for session persistence
   autoStateFilePath?: string;
 }
@@ -667,10 +672,13 @@ export interface ErrorsCommand extends BaseCommand {
   clear?: boolean;
 }
 
-// Keyboard shortcuts
+// Raw keyboard input (no selector needed)
 export interface KeyboardCommand extends BaseCommand {
   action: 'keyboard';
-  keys: string; // e.g., "Control+a", "Shift+Tab"
+  subaction?: 'type' | 'press' | 'insertText'; // press kept for backward compat
+  keys?: string; // for legacy press path
+  text?: string; // for type/insertText
+  delay?: number; // for type (ms between keystrokes)
 }
 
 // Mouse wheel
@@ -1024,7 +1032,54 @@ export type Command =
   | DeviceListCommand
   | DiffSnapshotCommand
   | DiffScreenshotCommand
-  | DiffUrlCommand;
+  | DiffUrlCommand
+  | AuthSaveCommand
+  | AuthLoginCommand
+  | AuthListCommand
+  | AuthDeleteCommand
+  | AuthShowCommand
+  | ConfirmCommand
+  | DenyCommand;
+
+export interface AuthSaveCommand extends BaseCommand {
+  action: 'auth_save';
+  name: string;
+  url: string;
+  username: string;
+  password: string;
+  usernameSelector?: string;
+  passwordSelector?: string;
+  submitSelector?: string;
+}
+
+export interface AuthLoginCommand extends BaseCommand {
+  action: 'auth_login';
+  name: string;
+}
+
+export interface AuthListCommand extends BaseCommand {
+  action: 'auth_list';
+}
+
+export interface AuthDeleteCommand extends BaseCommand {
+  action: 'auth_delete';
+  name: string;
+}
+
+export interface AuthShowCommand extends BaseCommand {
+  action: 'auth_show';
+  name: string;
+}
+
+export interface ConfirmCommand extends BaseCommand {
+  action: 'confirm';
+  confirmationId: string;
+}
+
+export interface DenyCommand extends BaseCommand {
+  action: 'deny';
+  confirmationId: string;
+}
 
 // Diff commands
 export interface DiffSnapshotCommand extends BaseCommand {
@@ -1097,14 +1152,38 @@ export interface SnapshotData {
     string,
     { role: string; name?: string; attributes?: Record<string, string | boolean> }
   >;
+  origin?: string;
 }
 
 export interface EvaluateData {
   result: unknown;
+  origin?: string;
 }
 
 export interface ContentData {
   html: string;
+  origin?: string;
+}
+
+export interface TextData {
+  text: string | null;
+  origin?: string;
+}
+
+export interface AttributeData {
+  attribute: string;
+  value: string | null;
+  origin?: string;
+}
+
+export interface ValueData {
+  value: string;
+  origin?: string;
+}
+
+export interface ConsoleData {
+  messages: Array<{ type: string; text: string }>;
+  origin?: string;
 }
 
 export interface TabInfo {

@@ -23,7 +23,7 @@ export interface RefMap {
   [ref: string]: {
     selector: string;
     role: string;
-    name?: string;
+    name: string;
     /** Index for disambiguation when multiple elements have same role+name */
     nth?: number;
     /** All ARIA attributes from the element (expanded, pressed, level=1, etc.) */
@@ -132,12 +132,9 @@ const STRUCTURAL_ROLES = new Set([
 /**
  * Build a selector string for storing in ref map
  */
-function buildSelector(role: string, name?: string): string {
-  if (name) {
-    const escapedName = JSON.stringify(name);
-    return `getByRole('${role}', { name: ${escapedName}, exact: true })`;
-  }
-  return `getByRole('${role}')`;
+function buildSelector(role: string, name: string): string {
+  const escapedName = JSON.stringify(name);
+  return `getByRole('${role}', { name: ${escapedName}, exact: true })`;
 }
 
 /**
@@ -318,7 +315,7 @@ export async function getEnhancedSnapshot(
     const cursorElements = await findCursorInteractiveElements(page, options.selector);
 
     // Filter out elements whose text is already captured in the snapshot
-    const existingTexts = new Set(Object.values(refs).map((r) => r.name?.toLowerCase()));
+    const existingTexts = new Set(Object.values(refs).map((r) => r.name.toLowerCase()));
     // Also extract quoted strings from the ARIA tree for broader dedup
     for (const m of enhancedTree.matchAll(/"([^"]+)"/g)) {
       existingTexts.add(m[1].toLowerCase());
@@ -433,9 +430,9 @@ function processAriaTree(ariaTree: string, refs: RefMap, options: SnapshotOption
         const attributes = parseAttributes(suffix);
         tracker.trackRef(roleLower, name, ref);
         refs[ref] = {
-          selector: buildSelector(roleLower, name),
+          selector: buildSelector(roleLower, resolvedName),
           role: roleLower,
-          name,
+          name: resolvedName,
           nth, // Always store nth, we'll use it for duplicates
           attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
         };
@@ -563,9 +560,9 @@ function processLine(
     tracker.trackRef(roleLower, name, ref);
 
     refs[ref] = {
-      selector: buildSelector(roleLower, name),
+      selector: buildSelector(roleLower, resolvedName),
       role: roleLower,
-      name,
+      name: resolvedName,
       nth, // Always store nth, we'll clean up non-duplicates later
       attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
     };

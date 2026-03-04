@@ -83,7 +83,7 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
     let rest: Vec<&str> = args[1..].iter().map(|s| s.as_str()).collect();
     let id = gen_id();
 
-    if flags.annotate && cmd != "screenshot" {
+    if flags.cli_annotate && cmd != "screenshot" {
         eprintln!(
             "{} --annotate only applies to the screenshot command",
             color::warning_indicator()
@@ -92,6 +92,7 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
 
     match cmd {
         // === Navigation ===
+        // Maps to "navigate" action in protocol; reflected in ACTION_CATEGORIES in action-policy.ts
         "open" | "goto" | "navigate" => {
             let url = rest.first().ok_or_else(|| ParseError::MissingArguments {
                 context: cmd.to_string(),
@@ -103,6 +104,8 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
                 || url_lower.starts_with("about:")
                 || url_lower.starts_with("data:")
                 || url_lower.starts_with("file:")
+                || url_lower.starts_with("chrome-extension://")
+                || url_lower.starts_with("chrome://")
             {
                 url.to_string()
             } else {
@@ -111,10 +114,12 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
             let mut nav_cmd = json!({ "id": id, "action": "navigate", "url": url });
             // If --headers flag is set, include headers (scoped to this origin)
             if let Some(ref headers_json) = flags.headers {
-                let headers = serde_json::from_str::<serde_json::Value>(headers_json)
-                    .map_err(|_| ParseError::InvalidValue {
-                        message: format!("Invalid JSON for --headers: {}", headers_json),
-                        usage: "open <url> --headers '{\"Key\": \"Value\"}'",
+                let headers =
+                    serde_json::from_str::<serde_json::Value>(headers_json).map_err(|_| {
+                        ParseError::InvalidValue {
+                            message: format!("Invalid JSON for --headers: {}", headers_json),
+                            usage: "open <url> --headers '{\"Key\": \"Value\"}'",
+                        }
                     })?;
                 nav_cmd["headers"] = headers;
             }
@@ -263,15 +268,85 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
             })?;
             Ok(json!({ "id": id, "action": "keyup", "key": key }))
         }
+        "keyboard" => {
+            let sub = rest.first().ok_or_else(|| ParseError::MissingArguments {
+                context: "keyboard".to_string(),
+                usage: "keyboard <type|inserttext> <text>",
+            })?;
+            match *sub {
+                "type" => {
+                    let text: String = rest[1..].join(" ");
+                    if text.is_empty() {
+                        return Err(ParseError::MissingArguments {
+                            context: "keyboard type".to_string(),
+                            usage: "keyboard type <text>",
+                        });
+                    }
+                    Ok(json!({ "id": id, "action": "keyboard", "subaction": "type", "text": text }))
+                }
+                "inserttext" | "insertText" => {
+                    let text: String = rest[1..].join(" ");
+                    if text.is_empty() {
+                        return Err(ParseError::MissingArguments {
+                            context: "keyboard inserttext".to_string(),
+                            usage: "keyboard inserttext <text>",
+                        });
+                    }
+                    Ok(
+                        json!({ "id": id, "action": "keyboard", "subaction": "insertText", "text": text }),
+                    )
+                }
+                _ => Err(ParseError::UnknownSubcommand {
+                    subcommand: sub.to_string(),
+                    valid_options: &["type", "inserttext"],
+                }),
+            }
+        }
 
         // === Scroll ===
         "scroll" => {
-            let dir = rest.first().unwrap_or(&"down");
-            let amount = rest
-                .get(1)
-                .and_then(|s| s.parse::<i32>().ok())
-                .unwrap_or(300);
-            Ok(json!({ "id": id, "action": "scroll", "direction": dir, "amount": amount }))
+            let mut cmd = json!({ "id": id, "action": "scroll" });
+            let obj = cmd.as_object_mut().unwrap();
+            let mut positional_index = 0;
+            let mut i = 0;
+            while i < rest.len() {
+                match rest[i] {
+                    "-s" | "--selector" => {
+                        if let Some(s) = rest.get(i + 1) {
+                            obj.insert("selector".to_string(), json!(s));
+                            i += 1;
+                        } else {
+                            return Err(ParseError::MissingArguments {
+                                context: "scroll --selector".to_string(),
+                                usage: "scroll [direction] [amount] [--selector <sel>]",
+                            });
+                        }
+                    }
+                    arg if arg.starts_with('-') => {}
+                    _ => {
+                        match positional_index {
+                            0 => {
+                                obj.insert("direction".to_string(), json!(rest[i]));
+                            }
+                            1 => {
+                                if let Ok(n) = rest[i].parse::<i32>() {
+                                    obj.insert("amount".to_string(), json!(n));
+                                }
+                            }
+                            _ => {}
+                        }
+                        positional_index += 1;
+                    }
+                }
+                i += 1;
+            }
+            if !obj.contains_key("direction") {
+                obj.insert("direction".to_string(), json!("down"));
+            }
+            if !obj.contains_key("amount") {
+                obj.insert("amount".to_string(), json!(300));
+            }
+            Ok(cmd)
         }
         "scrollintoview" | "scrollinto" => {
             let sel = rest.first().ok_or_else(|| ParseError::MissingArguments {
@@ -495,6 +570,151 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
 
         // === Close ===
         "close" | "quit" | "exit" => Ok(json!({ "id": id, "action": "close" })),
+
+        // === Authentication Vault ===
+        "auth" => {
+            let sub = rest.first().map(|s| s.as_ref());
+            match sub {
+                Some("save") => {
+                    let name = rest.get(1).ok_or_else(|| ParseError::MissingArguments {
+                        context: "auth save".to_string(),
+                        usage: "agent-browser auth save <name> --url <url> --username <user> --password <pass>",
+                    })?;
+
+                    let mut url = None;
+                    let mut username = None;
+                    let mut password = None;
+                    let mut password_stdin = false;
+                    let mut username_selector = None;
+                    let mut password_selector = None;
+                    let mut submit_selector = None;
+
+                    let mut j = 2;
+                    while j < rest.len() {
+                        match rest[j].as_ref() {
+                            "--url" => {
+                                url = rest.get(j + 1).cloned();
+                                j += 1;
+                            }
+                            "--username" => {
+                                username = rest.get(j + 1).cloned();
+                                j += 1;
+                            }
+                            "--password" => {
+                                password = rest.get(j + 1).cloned();
+                                j += 1;
+                            }
+                            "--password-stdin" => {
+                                password_stdin = true;
+                            }
+                            "--username-selector" => {
+                                username_selector = rest.get(j + 1).cloned();
+                                j += 1;
+                            }
+                            "--password-selector" => {
+                                password_selector = rest.get(j + 1).cloned();
+                                j += 1;
+                            }
+                            "--submit-selector" => {
+                                submit_selector = rest.get(j + 1).cloned();
+                                j += 1;
+                            }
+                            other => {
+                                if other.starts_with("--") {
+                                    return Err(ParseError::InvalidValue {
+                                        message: format!("unknown flag '{}' for auth save", other),
+                                        usage: "agent-browser auth save <name> --url <url> --username <user> --password <pass>",
+                                    });
+                                }
+                            }
+                        }
+                        j += 1;
+                    }
+
+                    let url_val = url.ok_or_else(|| ParseError::MissingArguments {
+                        context: "auth save".to_string(),
+                        usage: "agent-browser auth save <name> --url <url> --username <user> --password <pass> [--password-stdin]",
+                    })?;
+                    let user_val = username.ok_or_else(|| ParseError::MissingArguments {
+                        context: "auth save".to_string(),
+                        usage: "agent-browser auth save <name> --url <url> --username <user> --password <pass> [--password-stdin]",
+                    })?;
+
+                    if !password_stdin && password.is_none() {
+                        return Err(ParseError::MissingArguments {
+                            context: "auth save".to_string(),
+                            usage: "agent-browser auth save <name> --url <url> --username <user> --password <pass> [--password-stdin]",
+                        });
+                    }
+
+                    let mut cmd = json!({
+                        "id": id,
+                        "action": "auth_save",
+                        "name": name,
+                        "url": url_val,
+                        "username": user_val,
+                    });
+                    if password_stdin {
+                        cmd["passwordStdin"] = json!(true);
+                    }
+                    if let Some(pass_val) = password {
+                        cmd["password"] = json!(pass_val);
+                    }
+                    if let Some(us) = username_selector {
+                        cmd["usernameSelector"] = json!(us);
+                    }
+                    if let Some(ps) = password_selector {
+                        cmd["passwordSelector"] = json!(ps);
+                    }
+                    if let Some(ss) = submit_selector {
+                        cmd["submitSelector"] = json!(ss);
+                    }
+                    Ok(cmd)
+                }
+                Some("login") => {
+                    let name = rest.get(1).ok_or_else(|| ParseError::MissingArguments {
+                        context: "auth login".to_string(),
+                        usage: "agent-browser auth login <name>",
+                    })?;
+                    Ok(json!({ "id": id, "action": "auth_login", "name": name }))
+                }
+                Some("list") => Ok(json!({ "id": id, "action": "auth_list" })),
+                Some("delete") | Some("remove") => {
+                    let name = rest.get(1).ok_or_else(|| ParseError::MissingArguments {
+                        context: "auth delete".to_string(),
+                        usage: "agent-browser auth delete <name>",
+                    })?;
+                    Ok(json!({ "id": id, "action": "auth_delete", "name": name }))
+                }
+                Some("show") => {
+                    let name = rest.get(1).ok_or_else(|| ParseError::MissingArguments {
+                        context: "auth show".to_string(),
+                        usage: "agent-browser auth show <name>",
+                    })?;
+                    Ok(json!({ "id": id, "action": "auth_show", "name": name }))
+                }
+                _ => Err(ParseError::UnknownSubcommand {
+                    subcommand: sub.unwrap_or("(none)").to_string(),
+                    valid_options: &["save", "login", "list", "delete", "show"],
+                }),
+            }
+        }
+
+        // === Action Confirmation ===
+        "confirm" => {
+            let cid = rest.first().ok_or_else(|| ParseError::MissingArguments {
+                context: "confirm".to_string(),
+                usage: "agent-browser confirm <confirmation-id>",
+            })?;
+            Ok(json!({ "id": id, "action": "confirm", "confirmationId": cid }))
+        }
+        "deny" => {
+            let cid = rest.first().ok_or_else(|| ParseError::MissingArguments {
+                context: "deny".to_string(),
+                usage: "agent-browser deny <confirmation-id>",
+            })?;
+            Ok(json!({ "id": id, "action": "deny", "confirmationId": cid }))
+        }
 
         // === Connect (CDP) ===
         "connect" => {
@@ -826,8 +1046,8 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
                     let url = rest.get(2);
                     let mut cmd = json!({ "id": id, "action": "recording_start", "path": path });
                     if let Some(u) = url {
-                        // Add https:// prefix if needed
-                        let url_str = if u.starts_with("http") {
+                        // Add https:// prefix if needed (preserve special schemes)
+                        let url_str = if u.starts_with("http") || u.contains("://") {
                             u.to_string()
                         } else {
                             format!("https://{}", u)
@@ -846,8 +1066,8 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
                     let url = rest.get(2);
                     let mut cmd = json!({ "id": id, "action": "recording_restart", "path": path });
                     if let Some(u) = url {
-                        // Add https:// prefix if needed
-                        let url_str = if u.starts_with("http") {
+                        // Add https:// prefix if needed (preserve special schemes)
+                        let url_str = if u.starts_with("http") || u.contains("://") {
                             u.to_string()
                         } else {
                             format!("https://{}", u)
@@ -900,9 +1120,7 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
                     })?;
                     Ok(json!({ "id": id, "action": "state_load", "path": path }))
                 }
-                Some("list") => {
-                    Ok(json!({ "id": id, "action": "state_list" }))
-                }
+                Some("list") => Ok(json!({ "id": id, "action": "state_list" })),
                 Some("clear") => {
                     let mut session_name: Option<&str> = None;
                     let mut all = false;
@@ -923,7 +1141,9 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
 
                     if let Some(name) = session_name {
                         if !is_valid_session_name(name) {
-                            return Err(ParseError::InvalidSessionName { name: name.to_string() });
+                            return Err(ParseError::InvalidSessionName {
+                                name: name.to_string(),
+                            });
                         }
                     }
 
@@ -977,13 +1197,19 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
                     let new_name = new_name.trim_end_matches(".json");
 
                     if !is_valid_session_name(old_name) {
-                        return Err(ParseError::InvalidSessionName { name: old_name.to_string() });
+                        return Err(ParseError::InvalidSessionName {
+                            name: old_name.to_string(),
+                        });
                     }
                     if !is_valid_session_name(new_name) {
-                        return Err(ParseError::InvalidSessionName { name: new_name.to_string() });
+                        return Err(ParseError::InvalidSessionName {
+                            name: new_name.to_string(),
+                        });
                     }
 
-                    Ok(json!({ "id": id, "action": "state_rename", "oldName": old_name, "newName": new_name }))
+                    Ok(
+                        json!({ "id": id, "action": "state_rename", "oldName": old_name, "newName": new_name }),
+                    )
                 }
                 Some(sub) => Err(ParseError::UnknownSubcommand {
                     subcommand: sub.to_string(),
@@ -1092,7 +1318,10 @@ fn parse_diff(rest: &[&str], id: &str, flags: &Flags) -> Result<Value, ParseErro
                                 }
                                 Err(_) => {
                                     return Err(ParseError::InvalidValue {
-                                        message: format!("Depth must be a non-negative integer, got: {}", d),
+                                        message: format!(
+                                            "Depth must be a non-negative integer, got: {}",
+                                            d
+                                        ),
                                         usage: "diff snapshot --depth <n>",
                                     });
                                 }
@@ -1158,7 +1387,10 @@ fn parse_diff(rest: &[&str], id: &str, flags: &Flags) -> Result<Value, ParseErro
                                 }
                                 Ok(n) => {
                                     return Err(ParseError::InvalidValue {
-                                        message: format!("Threshold must be between 0 and 1, got {}", n),
+                                        message: format!(
+                                            "Threshold must be between 0 and 1, got {}",
+                                            n
+                                        ),
                                         usage: "diff screenshot --threshold <0-1>",
                                     });
                                 }
@@ -1275,7 +1507,10 @@ fn parse_diff(rest: &[&str], id: &str, flags: &Flags) -> Result<Value, ParseErro
                                 }
                                 Err(_) => {
                                     return Err(ParseError::InvalidValue {
-                                        message: format!("Depth must be a non-negative integer, got: {}", d),
+                                        message: format!(
+                                            "Depth must be a non-negative integer, got: {}",
+                                            d
+                                        ),
                                         usage: "diff url <url1> <url2> --depth <n>",
                                     });
                                 }
@@ -1867,7 +2102,19 @@ mod tests {
             cli_proxy: false,
             cli_proxy_bypass: false,
             cli_allow_file_access: false,
+            cli_annotate: false,
+            cli_download_path: false,
+            cli_native: false,
             annotate: false,
+            color_scheme: None,
+            download_path: None,
+            content_boundaries: false,
+            max_output: None,
+            allowed_domains: None,
+            action_policy: None,
+            confirm_actions: None,
+            confirm_interactive: false,
+            native: false,
         }
     }
 
@@ -2161,6 +2408,24 @@ mod tests {
         let err = result.unwrap_err();
         let msg = err.format();
         assert!(msg.contains("Invalid JSON for --headers"));
+    }
+
+    #[test]
+    fn test_navigate_chrome_extension_url() {
+        let cmd = parse_command(
+            &args("open chrome-extension://abcdefghijklmnop/popup.html"),
+            &default_flags(),
+        )
+        .unwrap();
+        assert_eq!(cmd["action"], "navigate");
+        assert_eq!(cmd["url"], "chrome-extension://abcdefghijklmnop/popup.html");
+    }
+
+    #[test]
+    fn test_navigate_chrome_url() {
+        let cmd = parse_command(&args("open chrome://extensions"), &default_flags()).unwrap();
+        assert_eq!(cmd["action"], "navigate");
+        assert_eq!(cmd["url"], "chrome://extensions");
     }
 
     // === Set Headers Tests ===
@@ -2595,6 +2860,18 @@ mod tests {
         assert_eq!(cmd["action"], "recording_start");
         assert_eq!(cmd["path"], "demo.webm");
         assert_eq!(cmd["url"], "https://example.com");
+    }
+
+    #[test]
+    fn test_record_start_with_chrome_extension_url() {
+        let cmd = parse_command(
+            &args("record start demo.webm chrome-extension://abcdef/popup.html"),
+            &default_flags(),
+        )
+        .unwrap();
+        assert_eq!(cmd["action"], "recording_start");
+        assert_eq!(cmd["path"], "demo.webm");
+        assert_eq!(cmd["url"], "chrome-extension://abcdef/popup.html");
     }
 
     #[test]
@@ -3091,8 +3368,11 @@ mod tests {
 
     #[test]
     fn test_diff_snapshot_baseline() {
-        let cmd =
-            parse_command(&args("diff snapshot --baseline before.txt"), &default_flags()).unwrap();
+        let cmd = parse_command(
+            &args("diff snapshot --baseline before.txt"),
+            &default_flags(),
+        )
+        .unwrap();
         assert_eq!(cmd["action"], "diff_snapshot");
         assert_eq!(cmd["baseline"], "before.txt");
     }
@@ -3112,9 +3392,11 @@ mod tests {
 
     #[test]
     fn test_diff_snapshot_short_flags() {
-        let cmd =
-            parse_command(&args("diff snapshot -b snap.txt -s .content -c -d 2"), &default_flags())
-                .unwrap();
+        let cmd = parse_command(
+            &args("diff snapshot -b snap.txt -s .content -c -d 2"),
+            &default_flags(),
+        )
+        .unwrap();
         assert_eq!(cmd["action"], "diff_snapshot");
         assert_eq!(cmd["baseline"], "snap.txt");
         assert_eq!(cmd["selector"], ".content");
@@ -3162,8 +3444,7 @@ mod tests {
     fn test_diff_screenshot_global_full_flag() {
         let mut flags = default_flags();
         flags.full = true;
-        let cmd =
-            parse_command(&args("diff screenshot --baseline b.png"), &flags).unwrap();
+        let cmd = parse_command(&args("diff screenshot --baseline b.png"), &flags).unwrap();
         assert_eq!(cmd["action"], "diff_screenshot");
         assert_eq!(cmd["fullPage"], true);
     }
@@ -3207,8 +3488,7 @@ mod tests {
     fn test_diff_url_global_full_flag() {
         let mut flags = default_flags();
         flags.full = true;
-        let cmd =
-            parse_command(&args("diff url https://a.com https://b.com"), &flags).unwrap();
+        let cmd = parse_command(&args("diff url https://a.com https://b.com"), &flags).unwrap();
         assert_eq!(cmd["fullPage"], true);
     }
 
@@ -3490,6 +3770,76 @@ mod tests {
             &args("diff url https://a.com https://b.com --selector"),
             &default_flags(),
         );
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::MissingArguments { .. }
+        ));
+    }
+
+    // === Scroll Tests ===
+
+    #[test]
+    fn test_scroll_defaults() {
+        let cmd = parse_command(&args("scroll"), &default_flags()).unwrap();
+        assert_eq!(cmd["action"], "scroll");
+        assert_eq!(cmd["direction"], "down");
+        assert_eq!(cmd["amount"], 300);
+        assert!(cmd.get("selector").is_none());
+    }
+
+    #[test]
+    fn test_scroll_direction_and_amount() {
+        let cmd = parse_command(&args("scroll up 200"), &default_flags()).unwrap();
+        assert_eq!(cmd["action"], "scroll");
+        assert_eq!(cmd["direction"], "up");
+        assert_eq!(cmd["amount"], 200);
+    }
+
+    #[test]
+    fn test_scroll_with_selector() {
+        let cmd = parse_command(
+            &args("scroll down 500 --selector div.scroll-container"),
+            &default_flags(),
+        )
+        .unwrap();
+        assert_eq!(cmd["action"], "scroll");
+        assert_eq!(cmd["direction"], "down");
+        assert_eq!(cmd["amount"], 500);
+        assert_eq!(cmd["selector"], "div.scroll-container");
+    }
+
+    #[test]
+    fn test_scroll_with_selector_short_flag() {
+        let cmd = parse_command(&args("scroll left 100 -s .sidebar"), &default_flags()).unwrap();
+        assert_eq!(cmd["action"], "scroll");
+        assert_eq!(cmd["direction"], "left");
+        assert_eq!(cmd["amount"], 100);
+        assert_eq!(cmd["selector"], ".sidebar");
+    }
+
+    #[test]
+    fn test_scroll_selector_before_positional() {
+        let cmd =
+            parse_command(&args("scroll --selector .panel down 400"), &default_flags()).unwrap();
+        assert_eq!(cmd["action"], "scroll");
+        assert_eq!(cmd["direction"], "down");
+        assert_eq!(cmd["amount"], 400);
+        assert_eq!(cmd["selector"], ".panel");
+    }
+
+    #[test]
+    fn test_scroll_selector_only() {
+        let cmd = parse_command(&args("scroll --selector .content"), &default_flags()).unwrap();
+        assert_eq!(cmd["action"], "scroll");
+        assert_eq!(cmd["direction"], "down");
+        assert_eq!(cmd["amount"], 300);
+        assert_eq!(cmd["selector"], ".content");
+    }
+
+    #[test]
+    fn test_scroll_selector_missing_value() {
+        let result = parse_command(&args("scroll down 500 --selector"), &default_flags());
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),

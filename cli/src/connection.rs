@@ -236,6 +236,7 @@ pub struct DaemonOptions<'a> {
     pub native: bool,
     pub timeout: Option<&'a str>,
     pub action_timeout: Option<&'a str>,
+    pub engine: Option<&'a str>,
 }
 
 fn apply_daemon_env(cmd: &mut Command, session: &str, opts: &DaemonOptions) {
@@ -304,6 +305,9 @@ fn apply_daemon_env(cmd: &mut Command, session: &str, opts: &DaemonOptions) {
     }
     if let Some(action_timeout) = opts.action_timeout {
         cmd.env("AGENT_BROWSER_ACTION_TIMEOUT", action_timeout);
+    }
+    if let Some(engine) = opts.engine {
+        cmd.env("AGENT_BROWSER_ENGINE", engine);
     }
 }
 
@@ -537,15 +541,10 @@ pub fn ensure_daemon(session: &str, opts: &DaemonOptions) -> Result<DaemonResult
     #[cfg(unix)]
     let endpoint_info = format!(
         "socket: {}",
-        get_socket_dir()
-            .join(format!("{}.sock", session))
-            .display()
+        get_socket_dir().join(format!("{}.sock", session)).display()
     );
     #[cfg(windows)]
-    let endpoint_info = format!(
-        "port: 127.0.0.1:{}",
-        get_port_for_session(session)
-    );
+    let endpoint_info = format!("port: 127.0.0.1:{}", get_port_for_session(session));
 
     Err(format!("Daemon failed to start ({})", endpoint_info))
 }

@@ -3,29 +3,6 @@ use std::sync::OnceLock;
 use crate::color;
 use crate::connection::Response;
 
-pub fn print_response(resp: &Response, json_mode: bool, action: Option<&str>, no_snapshot: bool) {
-    if json_mode {
-        // In JSON mode: strip snapshot when --no-snapshot flag is set
-        if no_snapshot && action == Some("snapshot") {
-            if let Some(mut data) = resp.data.clone() {
-                if let Some(obj) = data.as_object_mut() {
-                    obj.remove("snapshot");
-                    let filtered_resp = serde_json::json!({
-                        "success": resp.success,
-                        "data": data,
-                        "error": resp.error
-                    });
-                    println!("{}", serde_json::to_string(&filtered_resp).unwrap_or_default());
-                    return;
-                }
-            }
-        }
-        println!("{}", serde_json::to_string(resp).unwrap_or_default());
-    } else {
-        // ... rest of function
-    }
-}
-
 static BOUNDARY_NONCE: OnceLock<String> = OnceLock::new();
 
 /// Per-process nonce for content boundary markers. Uses a CSPRNG (getrandom) so

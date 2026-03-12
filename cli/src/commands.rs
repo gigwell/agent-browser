@@ -2137,6 +2137,7 @@ mod tests {
             confirm_interactive: false,
             native: false,
             engine: None,
+            no_viewport: false,
         }
     }
 

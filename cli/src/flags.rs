@@ -44,6 +44,7 @@ pub struct Config {
     pub confirm_interactive: Option<bool>,
     pub native: Option<bool>,
     pub engine: Option<String>,
+    pub no_viewport: Option<bool>,
 }
 
 impl Config {
@@ -88,6 +89,7 @@ impl Config {
             confirm_interactive: other.confirm_interactive.or(self.confirm_interactive),
             native: other.native.or(self.native),
             engine: other.engine.or(self.engine),
+            no_viewport: other.no_viewport.or(self.no_viewport),
         }
     }
 }
@@ -243,6 +245,7 @@ pub struct Flags {
     pub confirm_interactive: bool,
     pub native: bool,
     pub engine: Option<String>,
+    pub no_viewport: bool,
 
     // Track which launch-time options were explicitly passed via CLI
     // (as opposed to being set only via environment variables)
@@ -355,6 +358,7 @@ pub fn parse_flags(args: &[String]) -> Flags {
             || config.confirm_interactive.unwrap_or(false),
         native: env_var_is_truthy("AGENT_BROWSER_NATIVE") || config.native.unwrap_or(false),
         engine: env::var("AGENT_BROWSER_ENGINE").ok().or(config.engine),
+        no_viewport: env_var_is_truthy("AGENT_BROWSER_NO_VIEWPORT") || config.no_viewport.unwrap_or(false),
         cli_executable_path: false,
         cli_extensions: false,
         cli_profile: false,
@@ -594,6 +598,13 @@ pub fn parse_flags(args: &[String]) -> Flags {
                     i += 1;
                 }
             }
+            "--no-viewport" => {
+                let (val, consumed) = parse_bool_arg(args, i);
+                flags.no_viewport = val;
+                if consumed {
+                    i += 1;
+                }
+            }
             "--config" => {
                 // Already handled by load_config(); skip the value
                 i += 1;
@@ -630,6 +641,7 @@ pub fn clean_args(args: &[String]) -> Vec<String> {
         "--content-boundaries",
         "--confirm-interactive",
         "--native",
+        "--no-viewport",
     ];
     // Global flags that always take a value (need to skip the next arg too)
     const GLOBAL_FLAGS_WITH_VALUE: &[&str] = &[
@@ -1283,5 +1295,29 @@ mod tests {
         // But command should still be parsed correctly
         let cleaned = clean_args(&args("--action-timeout notanumber click @e1"));
         assert_eq!(cleaned, vec!["click", "@e1"]);
+    }
+
+    #[test]
+    fn test_parse_no_viewport_flag() {
+        let flags = parse_flags(&args("--no-viewport open example.com"));
+        assert!(flags.no_viewport);
+    }
+
+    #[test]
+    fn test_parse_no_viewport_false() {
+        let flags = parse_flags(&args("--no-viewport false open example.com"));
+        assert!(!flags.no_viewport);
+    }
+
+    #[test]
+    fn test_clean_args_removes_no_viewport() {
+        let cleaned = clean_args(&args("--no-viewport open example.com"));
+        assert_eq!(cleaned, vec!["open", "example.com"]);
+    }
+
+    #[test]
+    fn test_no_viewport_default_false() {
+        let flags = parse_flags(&args("open example.com"));
+        assert!(!flags.no_viewport);
     }
 }

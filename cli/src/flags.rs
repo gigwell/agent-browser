@@ -235,6 +235,7 @@ pub struct Flags {
     pub session_name: Option<String>,
     pub annotate: bool,
     pub action_timeout: Option<u64>,
+    pub no_snapshot: bool,
     pub color_scheme: Option<String>,
     pub download_path: Option<String>,
     pub content_boundaries: bool,
@@ -359,6 +360,7 @@ pub fn parse_flags(args: &[String]) -> Flags {
         native: env_var_is_truthy("AGENT_BROWSER_NATIVE") || config.native.unwrap_or(false),
         engine: env::var("AGENT_BROWSER_ENGINE").ok().or(config.engine),
         no_viewport: env_var_is_truthy("AGENT_BROWSER_NO_VIEWPORT") || config.no_viewport.unwrap_or(false),
+        no_snapshot: false,
         cli_executable_path: false,
         cli_extensions: false,
         cli_profile: false,
@@ -605,6 +607,13 @@ pub fn parse_flags(args: &[String]) -> Flags {
                     i += 1;
                 }
             }
+            "--no-snapshot" => {
+                let (val, consumed) = parse_bool_arg(args, i);
+                flags.no_snapshot = val;
+                if consumed {
+                    i += 1;
+                }
+            }
             "--config" => {
                 // Already handled by load_config(); skip the value
                 i += 1;
@@ -642,6 +651,7 @@ pub fn clean_args(args: &[String]) -> Vec<String> {
         "--confirm-interactive",
         "--native",
         "--no-viewport",
+        "--no-snapshot",
     ];
     // Global flags that always take a value (need to skip the next arg too)
     const GLOBAL_FLAGS_WITH_VALUE: &[&str] = &[

@@ -21,6 +21,8 @@ pub struct OutputOptions {
     pub json: bool,
     pub content_boundaries: bool,
     pub max_output: Option<usize>,
+    /// Whether --no-snapshot was passed (only applies in JSON mode)
+    pub no_snapshot: bool,
 }
 
 fn truncate_if_needed(content: &str, max: Option<usize>) -> String {
@@ -66,6 +68,22 @@ fn print_with_boundaries(content: &str, origin: Option<&str>, opts: &OutputOptio
 
 pub fn print_response_with_opts(resp: &Response, action: Option<&str>, opts: &OutputOptions) {
     if opts.json {
+        // In JSON mode: strip snapshot if --no-snapshot was passed
+        if opts.no_snapshot && action == Some("snapshot") {
+            if let Some(mut data) = resp.data.clone() {
+                if let Some(obj) = data.as_object_mut() {
+                    obj.remove("snapshot");
+                    let filtered_resp = serde_json::json!({
+                        "success": resp.success,
+                        "data": data,
+                        "error": resp.error
+                    });
+                    println!("{}", serde_json::to_string(&filtered_resp).unwrap_or_default());
+                    return;
+                }
+            }
+        }
+
         if opts.content_boundaries {
             let mut json_val = serde_json::to_value(resp).unwrap_or_default();
             if let Some(obj) = json_val.as_object_mut() {

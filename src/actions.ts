@@ -965,17 +965,11 @@ async function handleSnapshot(
     };
   }
 
-  // Default: include snapshot in response
-  // Use --no-snapshot to exclude for smaller payload
-  if (command.includeSnapshot !== false) {
-    return successResponse(command.id, {
-      snapshot: tree || 'Empty page',
-      refs: Object.keys(simpleRefs).length > 0 ? simpleRefs : undefined,
-    });
-  }
-
+  // Always include snapshot in the response
+  // The --no-snapshot flag is handled client-side in JSON mode only
   const page = browser.getPage();
   return successResponse(command.id, {
+    snapshot: tree || 'Empty page',
     refs: Object.keys(simpleRefs).length > 0 ? simpleRefs : undefined,
     origin: page.url(),
   });

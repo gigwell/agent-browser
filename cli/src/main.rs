@@ -135,6 +135,7 @@ fn run_auth_cli(cmd: &serde_json::Value, json_mode: bool) -> ! {
                             json: false,
                             content_boundaries: false,
                             max_output: None,
+                            no_snapshot: false,
                         };
                         print_response_with_opts(&resp, action, &opts);
                         if !resp.success {
@@ -862,6 +863,7 @@ fn main() {
         json: flags.json,
         content_boundaries: flags.content_boundaries,
         max_output: flags.max_output,
+        no_snapshot: flags.no_snapshot,
     };
 
     match send_command(cmd_to_send, &flags.session) {

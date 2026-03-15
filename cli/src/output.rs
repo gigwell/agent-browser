@@ -2510,6 +2510,7 @@ Options:
   --full, -f                 Full page screenshot
   --annotate                 Annotated screenshot with numbered labels and legend
   --headed                   Show browser window (not headless) (or AGENT_BROWSER_HEADED env)
+  --no-viewport              Disable viewport pinning, allow full browser resizing (or AGENT_BROWSER_NO_VIEWPORT env)
   --cdp <port>               Connect via CDP (Chrome DevTools Protocol)
   --color-scheme <scheme>    Color scheme: dark, light, no-preference (or AGENT_BROWSER_COLOR_SCHEME)
   --download-path <path>     Default download directory (or AGENT_BROWSER_DOWNLOAD_PATH)
@@ -2555,6 +2556,7 @@ Environment:
   AGENT_BROWSER_EXECUTABLE_PATH  Custom browser executable path
   AGENT_BROWSER_EXTENSIONS       Comma-separated browser extension paths
   AGENT_BROWSER_HEADED           Show browser window (not headless)
+  AGENT_BROWSER_NO_VIEWPORT      Disable viewport pinning, allow full browser resizing
   AGENT_BROWSER_JSON             JSON output
   AGENT_BROWSER_FULL             Full page screenshot
   AGENT_BROWSER_ANNOTATE         Annotated screenshot with numbered labels and legend

@@ -2138,6 +2138,7 @@ mod tests {
             native: false,
             engine: None,
             no_viewport: false,
+            no_snapshot: false,
         }
     }
 
